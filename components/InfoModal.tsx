@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Server, Lock, Key, ShieldCheck, Instagram, Globe, Code, CheckCircle, AlertTriangle } from 'lucide-react';
+import { X, Server, Lock, Key, ShieldCheck, Instagram, Globe, Code, CheckCircle, AlertTriangle, MousePointerClick, Search, UserCheck } from 'lucide-react';
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -32,13 +32,13 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
             onClick={() => setActiveTab('req')}
             className={`flex-1 py-3 text-sm font-medium transition flex items-center justify-center gap-2 ${activeTab === 'req' ? 'bg-white text-pink-600 border-t-2 border-pink-500' : 'text-gray-500 hover:bg-gray-100'}`}
           >
-            <ShieldCheck size={16} /> Requisitos & Permisos
+            <ShieldCheck size={16} /> Permisos Meta
           </button>
           <button 
             onClick={() => setActiveTab('webhook')}
             className={`flex-1 py-3 text-sm font-medium transition flex items-center justify-center gap-2 ${activeTab === 'webhook' ? 'bg-white text-pink-600 border-t-2 border-pink-500' : 'text-gray-500 hover:bg-gray-100'}`}
           >
-            <Globe size={16} /> Configurar Webhook
+            <Globe size={16} /> Webhook
           </button>
           <button 
             onClick={() => setActiveTab('code')}
@@ -51,36 +51,83 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
         {/* Content */}
         <div className="overflow-y-auto p-6 flex-1 bg-white">
           
-          {/* TAB 1: REQUISITOS Y PERMISOS */}
+          {/* TAB 1: GUÍA DE PERMISOS */}
           {activeTab === 'req' && (
-            <div className="space-y-6">
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Permisos de Meta:</strong> Revisa que tu "Page Access Token" tenga los siguientes scopes aprobados. Si falta uno, Vercel no podrá contestar.
+            <div className="space-y-6 text-sm text-gray-700">
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                <p className="text-blue-800 font-medium">
+                  Objetivo: Habilitar que tu App lea y responda mensajes.
+                </p>
+                <p className="text-blue-600 text-xs mt-1">
+                  Nota: Si tu app está en modo "Desarrollo", tú (el admin) tienes estos permisos automáticamente. Solo necesitas pedirlos formalmente ("App Review") si vas a abrir el bot al público general.
                 </p>
               </div>
 
-              <div className="grid gap-3">
-                 <PermissionItem name="instagram_basic" desc="Acceso básico al perfil de Instagram." />
-                 <PermissionItem name="instagram_manage_messages" desc="CRÍTICO. Permite leer y responder DMs." />
-                 <PermissionItem name="pages_manage_metadata" desc="Permite suscribir tu webhook a los eventos de la página." />
-                 <PermissionItem name="pages_messaging" desc="Permite enviar mensajes como la Página de Facebook vinculada." />
-                 <PermissionItem name="pages_show_list" desc="Necesario para listar las páginas y obtener tokens." />
-                 <PermissionItem name="business_management" desc="A veces requerido si la cuenta está en un Business Manager." />
-              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-4">Paso a Paso en developers.facebook.com:</h3>
 
-              <h3 className="font-bold text-gray-800 mt-6">Infraestructura</h3>
-              <div className="grid gap-4 md:grid-cols-2 mt-2">
-                <ReqItem 
-                  title="Vercel Project"
-                  desc="Un proyecto en Vercel donde alojarás la API (Serverless)."
-                  icon={<Globe className="w-5 h-5 text-black" />}
-                />
-                <ReqItem 
-                  title="Variables de Entorno"
-                  desc="Configura API_KEY (Gemini), IG_TOKEN (Meta) y VERIFY_TOKEN en Vercel."
-                  icon={<Key className="w-5 h-5 text-yellow-600" />}
-                />
+              <ol className="relative border-l border-gray-200 ml-3 space-y-8">
+                <Step 
+                  num="1" 
+                  title="Ve a 'Permisos y Funciones'" 
+                  desc="En el menú lateral izquierdo de tu App, busca 'App Review' (Revisión de la app) > 'Permissions and Features'."
+                >
+                   <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 bg-gray-100 p-2 rounded border">
+                      <MousePointerClick size={14} /> Dashboard &rarr; App Review &rarr; Permissions and Features
+                   </div>
+                </Step>
+
+                <Step 
+                  num="2" 
+                  title="Busca y Solicita 'instagram_manage_messages'" 
+                  desc="Este es el permiso MÁS importante. Permite al bot leer DMs y contestar."
+                >
+                   <div className="mt-2 space-y-2">
+                      <div className="flex items-center justify-between p-2 bg-purple-50 border border-purple-100 rounded">
+                         <div className="flex items-center gap-2">
+                            <Search size={14} className="text-purple-400" />
+                            <code className="font-bold text-purple-700">instagram_manage_messages</code>
+                         </div>
+                         <span className="text-xs font-bold text-blue-600 border border-blue-200 px-2 py-0.5 rounded bg-white">Request Advanced Access</span>
+                      </div>
+                   </div>
+                </Step>
+
+                <Step 
+                  num="3" 
+                  title="Busca y Solicita 'pages_messaging'" 
+                  desc="Necesario porque Instagram está vinculado a una Página de Facebook."
+                >
+                   <div className="mt-2">
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+                         <CheckCircle size={14} className="text-green-500" />
+                         Solicitar también: <code className="font-bold">pages_show_list</code> e <code className="font-bold">instagram_basic</code>
+                      </div>
+                   </div>
+                </Step>
+
+                <Step 
+                  num="4" 
+                  title="Generar el Token" 
+                  desc="Una vez habilitados (o si eres admin en modo Desarrollo):"
+                >
+                   <ul className="list-disc pl-5 mt-2 space-y-1">
+                      <li>Ve a <strong>Dashboard &rarr; Productos &rarr; Instagram Graph API &rarr; API Setup</strong>.</li>
+                      <li>Ahí verás un botón azul grande: <strong>"Generate Access Token"</strong>.</li>
+                      <li>Ese es el código largo que necesitas copiar y pegar en las variables de entorno de Vercel como <code>IG_ACCESS_TOKEN</code>.</li>
+                   </ul>
+                </Step>
+              </ol>
+
+              <div className="mt-6 bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+                 <h4 className="font-bold text-yellow-800 flex items-center gap-2 mb-2">
+                    <UserCheck size={18} />
+                    ¿El bot no te responde a ti?
+                 </h4>
+                 <p className="text-xs text-yellow-800 leading-relaxed">
+                    Si la app está en modo "Desarrollo" (botón verde arriba del dashboard apagado), el bot <strong>SOLO responderá a usuarios Admin o Testers</strong>.
+                    <br/><br/>
+                    Para que responda a un amigo, ve a <strong>Roles &rarr; Roles</strong> y agrégalo como "Tester" con su ID de Facebook o nombre de usuario.
+                 </p>
               </div>
             </div>
           )}
@@ -225,30 +272,6 @@ async function processAndReply(recipientId, text) {
 };
 
 // Subcomponents
-const ReqItem = ({ title, desc, icon }: { title: string, desc: string, icon: React.ReactNode }) => (
-  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:shadow-md transition flex items-start gap-3">
-    <div className="bg-white p-2 rounded-full shadow-sm border border-slate-100 flex-shrink-0">
-      {icon}
-    </div>
-    <div>
-      <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
-      <p className="text-xs text-slate-600 leading-relaxed mt-1">{desc}</p>
-    </div>
-  </div>
-);
-
-const PermissionItem = ({ name, desc }: { name: string, desc: string }) => (
-  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-    <div className="mt-1">
-      <CheckCircle size={16} className="text-green-600" />
-    </div>
-    <div>
-      <code className="text-xs font-bold text-purple-700 bg-purple-50 px-1 py-0.5 rounded border border-purple-100">{name}</code>
-      <p className="text-xs text-gray-600 mt-1">{desc}</p>
-    </div>
-  </div>
-);
-
 const Step = ({ num, title, desc, children }: { num: string, title: string, desc: string, children?: React.ReactNode }) => (
   <li className="mb-8 ml-6 relative">
     <span className="absolute flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full -left-9 ring-4 ring-white text-blue-800 font-bold text-xs">
