@@ -1,0 +1,7 @@
+{
+  "name": "Duggled Bot Simulator",
+  "description": "A prototype interface to test the Duggled AI Assistant persona, capable of handling text and audio interactions with an Argentine personality.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
