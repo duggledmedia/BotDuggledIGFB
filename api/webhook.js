@@ -1,96 +1,93 @@
-import { GoogleGenAI } from "@google/genai";
+// NO importamos GoogleGenAI aquí arriba para que el archivo cargue instantáneo.
+// Esto evita errores de timeout o dependencias durante la verificación de Meta.
 
-// TOKEN FIJO para asegurar que la verificación de Meta pase sí o sí.
 const VERIFY_TOKEN = "DuggledBot";
 
-const SYSTEM_INSTRUCTION = `
-Eres el asistente virtual oficial de "Duggled" (www.duggled.com.ar).
-Personalidad:
-- Argentino, Porteño, canchero pero respetuoso. Usás "vos", "che", "joya", "al toque".
-- Tu objetivo es VENDER servicios de Diseño Web y Marketing Digital.
-- SIEMPRE buscás cerrar una reunión o pedir el WhatsApp.
-- Respuestas CORTAS (máximo 2 frases). Es un chat, no un email.
-- Aclará que sos un bot/asistente virtual en el primer mensaje si es un contacto nuevo.
-
-Ejemplos de respuesta:
-User: "Precio?"
-Bot: "¡Hola genio! 👋 Soy el asistente virtual de Duggled. Los precios dependen del proyecto, ¿qué tenés en mente? Pasame tu celu y te llamamos para asesorarte bien sin compromiso."
-
-User: "Hacen webs?"
-Bot: "¡Obvio! Hacemos webs que vuelan 🚀 y le sumamos marketing para que vendas más. ¿Querés agendar una videollamada cortita para ver tu idea?"
-`;
-
 export default async function handler(req, res) {
-  // A. VERIFICACIÓN DEL WEBHOOK (GET)
-  // Esta parte DEBE funcionar perfecto para que Meta te deje guardar la URL.
+  // =========================================================================
+  // A. VERIFICACIÓN (GET) - Esto tiene que ser RÁPIDO y SIN ERRORES
+  // =========================================================================
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    console.log("Intento de verificación:", { mode, token, challenge });
+    console.log("--> Intento de verificación GET recibido");
+    console.log("Datos:", { mode, token, challenge });
 
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      // Respondemos con el challenge en texto plano (IMPORTANTE: parseInt o conversión numérica a veces rompe, enviar string directo)
+      console.log("--> Verificación EXITOSA. Devolviendo challenge.");
+      // Respondemos con el challenge tal cual llegó.
       return res.status(200).send(challenge);
     } else {
-      return res.status(403).json({ error: 'Token incorrecto. Asegurate de usar DuggledBot en Meta.' });
+      console.log("--> Verificación FALLIDA. Token incorrecto o modo inválido.");
+      return res.status(403).json({ error: 'Token incorrecto. Usa: DuggledBot' });
     }
   }
 
-  // B. RECEPCIÓN DE MENSAJES (POST)
+  // =========================================================================
+  // B. MENSAJES (POST) - Aquí cargamos la IA solo si es necesario
+  // =========================================================================
   if (req.method === 'POST') {
     try {
       const body = req.body;
 
-      if (body.object === 'instagram') {
-        // Responder rápido a Meta para evitar timeouts
-        res.status(200).send('EVENT_RECEIVED');
+      // 1. Responder a Meta inmediatamente para que no reintenten
+      res.status(200).send('EVENT_RECEIVED');
 
-        // Procesar eventos
+      if (body.object === 'instagram') {
+        // Importación dinámica: Solo cargamos la librería pesada AHORA
+        // Esto evita que el servidor explote si falta la API Key al inicio
+        const { GoogleGenAI } = await import("@google/genai");
+        
+        // Procesamos mensajes
         for (const entry of body.entry) {
           if (entry.messaging) {
             for (const event of entry.messaging) {
+              // Ignorar ecos (mensajes enviados por el bot)
               if (event.message && !event.message.is_echo) {
                 const senderId = event.sender.id;
                 
-                if (event.message.text) {
-                  // "Fire and forget" - ejecutamos la lógica sin esperar (await) para que el response anterior salga rápido
-                  await processAndReply(senderId, event.message.text);
-                } 
-                else if (event.message.attachments && event.message.attachments[0].type === 'audio') {
-                   await sendMessage(senderId, "¡Recibí tu audio, crack! 🎧 Bancame que lo escucho (mentira, soy un bot de texto por ahora, pero escribime qué necesitás y te ayudo al toque).");
+                // Lógica principal
+                if (process.env.API_KEY && process.env.IG_ACCESS_TOKEN) {
+                    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                    
+                    if (event.message.text) {
+                      await handleTextMessage(ai, senderId, event.message.text);
+                    } 
+                    else if (event.message.attachments && event.message.attachments[0].type === 'audio') {
+                       await sendInstagramMessage(senderId, "🎧 ¡Recibí tu audio! Dame un toque que lo proceso (versión texto por ahora).");
+                    }
+                } else {
+                    console.error("Faltan variables de entorno (API_KEY o IG_ACCESS_TOKEN)");
                 }
               }
             }
           }
         }
-      } else {
-        res.status(404).send('Not an Instagram event');
       }
     } catch (error) {
-      console.error("Error en POST:", error);
-      // No enviamos 500 aquí para no alertar a Meta si ya enviamos 200, pero si falla antes:
-      if (!res.headersSent) res.status(500).send('Server Error');
+      console.error("Error en el proceso POST:", error);
     }
     return;
   }
   
+  // Si no es GET ni POST
   res.status(405).end();
 }
 
-// Función separada para lógica AI + Envío
-// Inicializamos la AI aquí adentro para que si falta la API Key, no explote la verificación GET
-async function processAndReply(recipientId, text) {
-  try {
-    if (!process.env.API_KEY) {
-      console.error("Falta la API_KEY en Vercel");
-      return;
-    }
+// --- FUNCIONES AUXILIARES ---
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // 1. Pensar respuesta
+async function handleTextMessage(ai, recipientId, text) {
+  try {
+    const SYSTEM_INSTRUCTION = `
+    Eres el asistente virtual de Duggled (www.duggled.com.ar).
+    Tu objetivo: VENDER servicios de Diseño Web + Marketing Digital.
+    Personalidad: Argentino, porteño, buena onda, usas emojis.
+    Regla de oro: Respuestas cortas y SIEMPRE intentar cerrar reunión o pedir WhatsApp.
+    Si te saludan, presentate como un asistente virtual automatizado.
+    `;
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: text,
@@ -100,23 +97,16 @@ async function processAndReply(recipientId, text) {
       }
     });
 
-    const botReply = response.text || "¡Uy! Me quedé pensando... ¿Me repetís?";
-
-    // 2. Enviar a Instagram
-    await sendMessage(recipientId, botReply);
+    const botReply = response.text || "¡Uy! Me quedé tildado. ¿Me repetís?";
+    await sendInstagramMessage(recipientId, botReply);
 
   } catch (error) {
-    console.error("Error AI/Reply logic:", error);
+    console.error("Error generando respuesta IA:", error);
   }
 }
 
-async function sendMessage(recipientId, text) {
+async function sendInstagramMessage(recipientId, text) {
   const token = process.env.IG_ACCESS_TOKEN;
-  if (!token) {
-    console.error("Falta IG_ACCESS_TOKEN en Vercel");
-    return;
-  }
-
   const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${token}`;
 
   try {
@@ -129,6 +119,6 @@ async function sendMessage(recipientId, text) {
       })
     });
   } catch (error) {
-    console.error("Error enviando mensaje a Meta:", error);
+    console.error("Error enviando a Meta:", error);
   }
 }
